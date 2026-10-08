@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Patrimoine</title>
+  <meta name="description" content="Suivi personnel du patrimoine financier">
+  <meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Patrimoine">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Patrimoine</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="syncStatus" class="sync" data-state="idle" title="État de la synchronisation"></span>
+      <button id="btnPrivacy" class="icon-btn" aria-label="Masquer les montants" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <button id="btnRefresh" class="icon-btn" aria-label="Actualiser">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+      </button>
+      <button id="btnSettings" class="icon-btn" aria-label="Réglages">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- Bienvenue (aucun compte configuré) -->
+    <section id="welcome" class="welcome" hidden>
+      <h1>Ton patrimoine, en un coup d'œil</h1>
+      <p>Les données sont stockées dans un gist GitHub privé : ton téléphone et la synchro IBKR y lisent et écrivent.</p>
+      <button class="btn btn-primary" data-open="settings">Configurer la synchronisation</button>
+      <button class="btn btn-ghost" id="btnDemo">Essayer avec des données fictives</button>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="hero">
+        <p class="eyebrow">Patrimoine total</p>
+        <p id="total" class="total money">—</p>
+        <div class="deltas">
+          <span id="deltaMonth" class="delta"></span>
+          <span id="deltaStart" class="delta muted"></span>
+        </div>
+        <p id="lastUpdate" class="small muted"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Évolution</h2>
+          <div class="seg" role="tablist" aria-label="Période">
+            <button role="tab" data-range="30">1M</button>
+            <button role="tab" data-range="182">6M</button>
+            <button role="tab" data-range="365" aria-selected="true">1A</button>
+            <button role="tab" data-range="0">Tout</button>
+          </div>
+        </div>
+        <div id="chart" class="chart" aria-label="Graphique de l'évolution du patrimoine"></div>
+        <p id="chartReadout" class="readout small"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Répartition</h2></div>
+        <div id="allocBar" class="alloc-bar" role="img" aria-label="Répartition par compte"></div>
+        <ul id="allocList" class="alloc-list"></ul>
+      </div>
+
+      <div class="section-head">
+        <h2>Comptes</h2>
+      </div>
+      <ul id="accounts" class="accounts"></ul>
+
+      <p class="footnote small muted">Les variations incluent tes versements : ce n'est pas la performance pure des placements.</p>
+    </section>
+  </main>
+
+  <button id="fab" class="fab" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Mettre à jour
+  </button>
+
+  <!-- Feuille : mise à jour des valeurs -->
+  <dialog id="sheetUpdate" class="sheet">
+    <form method="dialog" id="formUpdate">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <h2>Nouvelles valeurs</h2>
+      <label class="field">
+        <span>Date</span>
+        <input type="date" name="date" required>
+      </label>
+      <div id="updateFields" class="update-fields"></div>
+      <p class="small muted">Laisse vide un compte qui n'a pas changé.</p>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Feuille : détail d'un compte -->
+  <dialog id="sheetAccount" class="sheet">
+    <form method="dialog" id="formAccount">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <h2 id="accTitle" tabindex="-1" autofocus>Compte</h2>
+      <label class="field">
+        <span>Nom</span>
+        <input name="name" required maxlength="40">
+      </label>
+      <div class="field">
+        <span>Couleur</span>
+        <div id="accColors" class="swatches"></div>
+      </div>
+      <h3>Historique</h3>
+      <ul id="accHistory" class="history"></ul>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-danger-ghost" id="btnArchive">Archiver</button>
+        <button type="submit" class="btn btn-primary">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Feuille : réglages -->
+  <dialog id="sheetSettings" class="sheet">
+    <form method="dialog" id="formSettings">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <h2 tabindex="-1" autofocus>Réglages</h2>
+
+      <h3>Synchronisation GitHub</h3>
+      <label class="field">
+        <span>Token GitHub (droit « gist »)</span>
+        <input name="token" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…">
+      </label>
+      <label class="field">
+        <span>ID du gist</span>
+        <input name="gistId" autocomplete="off" spellcheck="false" placeholder="laisser vide pour en créer un">
+      </label>
+      <div class="row">
+        <button type="button" class="btn btn-ghost" id="btnTest">Tester / créer</button>
+        <span id="settingsMsg" class="small"></span>
+      </div>
+
+      <h3>Comptes</h3>
+      <ul id="settingsAccounts" class="settings-accounts"></ul>
+      <div class="row">
+        <input id="newAccountName" placeholder="Nouveau compte (ex. Assurance-vie)" maxlength="40">
+        <button type="button" class="btn btn-ghost" id="btnAddAccount">Ajouter</button>
+      </div>
+
+      <h3>Sauvegarde</h3>
+      <div class="row wrap">
+        <button type="button" class="btn btn-ghost" id="btnExport">Exporter (JSON)</button>
+        <label class="btn btn-ghost file-btn">Importer
+          <input type="file" id="fileImport" accept="application/json,.json" hidden>
+        </label>
+        <button type="button" class="btn btn-danger-ghost" id="btnReset">Effacer cet appareil</button>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
