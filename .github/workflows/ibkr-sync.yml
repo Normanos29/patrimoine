@@ -1,0 +1,27 @@
+name: Synchro IBKR
+
+on:
+  schedule:
+    # Du mardi au samedi à 6h17 UTC (8h17 à Paris en été), après la clôture US de la veille
+    - cron: "17 6 * * 2-6"
+  workflow_dispatch: # bouton « Run workflow » pour lancer à la main
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Récupérer la valeur IBKR et mettre à jour le gist
+        env:
+          IBKR_FLEX_TOKEN: ${{ secrets.IBKR_FLEX_TOKEN }}
+          IBKR_FLEX_QUERY_ID: ${{ secrets.IBKR_FLEX_QUERY_ID }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: python sync/ibkr_sync.py
